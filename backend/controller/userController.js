@@ -1,14 +1,29 @@
 
 const User = require('../models/userModels.js');
 const bcryptjs = require('bcryptjs');
-const jwtToken = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
+
+// Generate JWT Token
+const generateToken = (userId, res) => {
+    const token = jwt.sign(
+        { userId },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+    );
+
+    res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+};
 
 // Register Controller
 const userRegister = async (req, res) => {
     try {
         const { fullname, username, email, password, number } = req.body;
 
-        // Check required fields
         if (!fullname || !username || !email || !password || !number) {
             return res.status(400).json({
                 success: false,
@@ -16,7 +31,6 @@ const userRegister = async (req, res) => {
             });
         }
 
-        // Check existing user
         const user = await User.findOne({
             $or: [{ username }, { email }]
         });
@@ -28,10 +42,8 @@ const userRegister = async (req, res) => {
             });
         }
 
-        // Hash password
         const hashPassword = await bcryptjs.hash(password, 10);
 
-        // Create new user
         const newUser = new User({
             fullname,
             username,
@@ -42,8 +54,7 @@ const userRegister = async (req, res) => {
 
         await newUser.save();
 
-        // Generate JWT token
-        jwtToken(newUser._id, res);
+        generateToken(newUser._id, res);
 
         return res.status(201).json({
             success: true,
@@ -66,7 +77,6 @@ const userRegister = async (req, res) => {
     }
 };
 
-
 // Login Controller
 const userLogin = async (req, res) => {
     try {
@@ -79,7 +89,6 @@ const userLogin = async (req, res) => {
             });
         }
 
-        // Find user
         const user = await User.findOne({ email });
 
         if (!user) {
@@ -89,7 +98,6 @@ const userLogin = async (req, res) => {
             });
         }
 
-        // Compare password
         const comparePass = await bcryptjs.compare(
             password,
             user.password
@@ -102,7 +110,7 @@ const userLogin = async (req, res) => {
             });
         }
 
-        jwtToken(user._id, res);
+        generateToken(user._id, res);
 
         return res.status(200).json({
             success: true,
@@ -124,4 +132,4 @@ const userLogin = async (req, res) => {
     }
 };
 
-module.exports = { userRegister,userLogin };
+module.exports = {userRegister,userLogin};
